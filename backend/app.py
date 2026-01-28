@@ -1,13 +1,23 @@
 from openai import AzureOpenAI
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 
 app = FastAPI()
 
+# ✅ CORS FIX (FINAL)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 client = AzureOpenAI(
-    api_key=os.getenv("7vyPmoL0ax5yW627gDWLkSN6E3hsQmSOnJrH3VUbwb2JN6Zn6NLCJQQJ99CAAC5RqLJXJ3w3AAAAACOGX4hk"),
+    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
     api_version="2024-02-01",
     azure_endpoint="https://test-foundry-surana.openai.azure.com/"
 )
@@ -16,6 +26,11 @@ DEPLOYMENT = "gpt-4.1"
 
 class ChatRequest(BaseModel):
     question: str
+
+# ✅ Explicit OPTIONS handler (THIS FIXES IT)
+@app.options("/chat")
+def options_chat():
+    return {}
 
 @app.post("/chat")
 def chat(req: ChatRequest):
@@ -34,4 +49,12 @@ def chat(req: ChatRequest):
             if chunk.choices and chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
 
-    return StreamingResponse(stream(), media_type="text/plain")
+    return StreamingResponse(
+        stream(),
+        media_type="text/plain",
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
